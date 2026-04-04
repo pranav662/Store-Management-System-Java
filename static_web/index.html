@@ -133,9 +133,36 @@ tbody td{padding:11px 14px;color:#cbd5e1;vertical-align:middle}
 .modal-header h2{font-size:18px;font-weight:600;color:#f1f5f9}
 .modal-close{background:none;border:none;color:#64748b;font-size:20px;cursor:pointer;transition:color 0.2s}
 .modal-close:hover{color:#f1f5f9}
+
+/* ── Auth Screen ── */
+#auth-screen { position:fixed;top:0;left:0;right:0;bottom:0;background:#0a0e1a;z-index:99999; display:flex;align-items:center;justify-content:center; }
+.auth-box { background:#111827;border:1px solid #1e293b;border-radius:16px;width:100%;max-width:400px; padding:32px;box-shadow:0 20px 25px -5px rgba(0,0,0,0.5); }
+.auth-box h2 {text-align:center;font-size:24px;font-weight:700;color:#f1f5f9;margin-bottom:24px;}
+.auth-box .toggle {text-align:center;font-size:13px;color:#94a3b8;margin-top:16px;}
+.auth-box .toggle span {color:#10b981;cursor:pointer;font-weight:600;}
 </style>
 </head>
 <body>
+
+<!-- ── Auth Screen ── -->
+<div id="auth-screen">
+  <div class="auth-box">
+    <div style="text-align:center;font-size:40px;margin-bottom:8px">🛒</div>
+    <h2 id="auth-title">Sign In</h2>
+    <form id="auth-form">
+      <div class="form-group" style="margin-bottom:16px">
+        <label>Username</label>
+        <input id="auth-user" required autocomplete="off"/>
+      </div>
+      <div class="form-group" style="margin-bottom:24px">
+        <label>Password</label>
+        <input id="auth-pass" type="password" required/>
+      </div>
+      <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;font-size:15px;padding:10px" id="auth-submit">Sign In</button>
+    </form>
+    <div class="toggle" id="auth-toggle">Don't have an account? <span>Sign Up</span></div>
+  </div>
+</div>
 
 <!-- ── Sidebar ── -->
 <aside class="sidebar">
@@ -160,7 +187,11 @@ tbody td{padding:11px 14px;color:#cbd5e1;vertical-align:middle}
 <div class="main">
   <div class="header">
     <h1 id="page-title">Dashboard</h1>
-    <div class="header-meta" id="clock"></div>
+    <div style="display:flex; align-items:center; gap:16px">
+      <div id="user-badge" style="display:flex;align-items:center;gap:6px;font-size:13px;color:#cbd5e1;background:rgba(255,255,255,.05);padding:6px 12px;border-radius:20px;border:1px solid #1e293b"><span style="font-size:16px">👤</span> <strong id="current-user">...</strong></div>
+      <button class="btn btn-ghost btn-sm" onclick="logout()">Log Out</button>
+      <div class="header-meta" id="clock"></div>
+    </div>
   </div>
   <div class="content">
 
@@ -384,9 +415,12 @@ document.querySelectorAll('.nav-btn').forEach(btn => {
 
 // ── API helper ─────────────────────────────────────────────────────────────
 async function api(method, path, body) {
+  const token = localStorage.getItem('store_token');
   const opts = { method, headers: { 'Content-Type': 'application/json' } };
+  if (token) opts.headers['Authorization'] = 'Bearer ' + token;
   if (body) opts.body = JSON.stringify(body);
   const res = await fetch(path, opts);
+  if (res.status === 401) { logout(); throw new Error('Unauthorized'); }
   return res.json();
 }
 
@@ -731,8 +765,64 @@ async function toggleBillDetail(id, btn) {
 // ── Escape helper ──────────────────────────────────────────────────────────
 function esc(s) { if (!s) return ''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
+// ── Auth Logic ─────────────────────────────────────────────────────────────
+let isSignup = false;
+function attachToggle() {
+  document.getElementById('auth-toggle').querySelector('span').onclick = () => {
+    isSignup = !isSignup;
+    document.getElementById('auth-title').textContent = isSignup ? 'Create Account' : 'Sign In';
+    document.getElementById('auth-submit').textContent = isSignup ? 'Sign Up' : 'Sign In';
+    document.getElementById('auth-toggle').innerHTML = isSignup ? 'Already have an account? <span>Sign In</span>' : 'Don\'t have an account? <span>Sign Up</span>';
+    attachToggle();
+  };
+}
+attachToggle();
+
+document.getElementById('auth-form').onsubmit = async (e) => {
+  e.preventDefault();
+  const u = document.getElementById('auth-user').value;
+  const p = document.getElementById('auth-pass').value;
+  const endpoint = isSignup ? '/api/auth/signup' : '/api/auth/login';
+  
+  const res = await fetch(endpoint, {
+    method: 'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({username:u, password:p})
+  }).then(r => r.json());
+
+  if (res.error) { toast(res.error, 'error'); return; }
+  
+  if (isSignup) {
+    toast('Account created! Please sign in.');
+    document.getElementById('auth-toggle').querySelector('span').click();
+  } else {
+    localStorage.setItem('store_token', res.token);
+    document.getElementById('current-user').textContent = res.username;
+    document.getElementById('auth-screen').style.display = 'none';
+    toast('Welcome, ' + res.username + '!');
+    loadDashboard();
+  }
+};
+
+function logout() {
+  localStorage.removeItem('store_token');
+  document.getElementById('auth-screen').style.display = 'flex';
+  document.getElementById('auth-pass').value = '';
+}
+
 // ── Boot ───────────────────────────────────────────────────────────────────
-loadDashboard();
+async function boot() {
+  const token = localStorage.getItem('store_token');
+  if (!token) return; // auth screen remains active
+  try {
+    const res = await api('GET', '/api/user/profile');
+    if (res.success) {
+      document.getElementById('current-user').textContent = res.username;
+      document.getElementById('auth-screen').style.display = 'none';
+      loadDashboard();
+    }
+  } catch(e) {}
+}
+boot();
 </script>
 </body>
 </html>

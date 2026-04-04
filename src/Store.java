@@ -8,6 +8,7 @@ import java.io.*;
 import java.net.*;
 import java.sql.*;
 import java.util.*;
+import java.security.MessageDigest;
 
 /**
  * GroceryPro — Store Management System
@@ -17,6 +18,7 @@ public class Store {
 
     static final String DB  = System.getenv("RAILWAY_ENVIRONMENT") != null ? "jdbc:sqlite:/app/data/store.db" : "jdbc:sqlite:store.db";
     static final int    PORT = System.getenv("PORT") != null ? Integer.parseInt(System.getenv("PORT")) : 8080;
+    static final Map<String, String> activeSessions = Collections.synchronizedMap(new HashMap<>());
 
     // ══════════════════════════════════════════════════════════════════
     // OOP — Abstract base class (abstraction + encapsulation)
@@ -95,6 +97,7 @@ public class Store {
                 s.execute("CREATE TABLE IF NOT EXISTS customers(id INTEGER PRIMARY KEY AUTOINCREMENT,name TEXT,phone TEXT,email TEXT,address TEXT,created_at TEXT DEFAULT(datetime('now','localtime')))");
                 s.execute("CREATE TABLE IF NOT EXISTS bills(id INTEGER PRIMARY KEY AUTOINCREMENT,customer_id INTEGER,customer_name TEXT,total_amount REAL,discount REAL DEFAULT 0,payment_method TEXT,bill_date TEXT DEFAULT(datetime('now','localtime')))");
                 s.execute("CREATE TABLE IF NOT EXISTS bill_items(id INTEGER PRIMARY KEY AUTOINCREMENT,bill_id INTEGER,product_id INTEGER,product_name TEXT,quantity INTEGER,unit_price REAL,subtotal REAL)");
+                s.execute("CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY AUTOINCREMENT,username TEXT UNIQUE,password_hash TEXT,created_at TEXT DEFAULT(datetime('now','localtime')))");
                 try (ResultSet r = s.executeQuery("SELECT count(*) FROM products")) {
                     if (r.next() && r.getInt(1) == 0) seedProducts(c);
                 }
@@ -314,6 +317,20 @@ public class Store {
         }
 
         private static Connection conn() throws SQLException { return DriverManager.getConnection(DB); }
+        
+        static String hash(String plain) throws StoreException {
+            try {
+                MessageDigest digest = MessageDigest.getInstance("SHA-256");
+                byte[] hash = digest.digest(plain.getBytes("UTF-8"));
+                StringBuilder hexString = new StringBuilder(2 * hash.length);
+                for (byte b : hash) {
+                    String hex = Integer.toHexString(0xff & b);
+                    if (hex.length() == 1) hexString.append('0');
+                    hexString.append(hex);
+                }
+                return hexString.toString();
+            } catch (Exception e) { throw new StoreException("Hashing failed", e); }
+        }
     }
 
     // ══════════════════════════════════════════════════════════════════
@@ -365,6 +382,7 @@ public class Store {
                 // HashMap for HTTP headers
                 Map<String, String> headers = new HashMap<>();
                 int contentLength = 0;
+                String authToken = null;
                 String h;
                 while ((h = in.readLine()) != null && !h.isEmpty()) {
                     int ci = h.indexOf(": ");
@@ -372,6 +390,7 @@ public class Store {
                         String k = h.substring(0, ci), v = h.substring(ci + 2);
                         headers.put(k, v);
                         if (k.equalsIgnoreCase("Content-Length")) contentLength = Integer.parseInt(v.trim());
+                        if (k.equalsIgnoreCase("Authorization") && v.startsWith("Bearer ")) authToken = v.substring(7);
                     }
                 }
 
@@ -384,7 +403,7 @@ public class Store {
                 }
 
                 server.log(method + " " + path);
-                if (path.startsWith("/api/")) handleApi(method, path, body, pw);
+                if (path.startsWith("/api/")) handleApi(method, path, body, pw, authToken);
                 else serveHtml(pw);
 
             } catch (Exception e) { server.log("Handler error: " + e.getMessage()); }
@@ -392,11 +411,23 @@ public class Store {
         }
 
         // ── API Router ────────────────────────────────────────────────
-        void handleApi(String method, String path, String body, PrintWriter pw) {
+        void handleApi(String method, String path, String body, PrintWriter pw, String token) {
             String resp;
             try {
+                boolean isAuthRoute = path.startsWith("/api/auth/");
+                String user = token != null ? Store.activeSessions.get(token) : null;
+                
+                if (!isAuthRoute && user == null) {
+                    pw.print("HTTP/1.1 401 Unauthorized\r\nContent-Type: application/json; charset=utf-8\r\nAccess-Control-Allow-Origin: *\r\n\r\n{\"error\":\"Unauthorized\"}");
+                    pw.flush();
+                    return;
+                }
+
                 // switch-like if/else routing
-                if      (path.equals("/api/products")           && method.equals("GET"))    resp = productsJson();
+                if      (path.equals("/api/auth/signup")        && method.equals("POST"))   resp = signupHandler(body);
+                else if (path.equals("/api/auth/login")         && method.equals("POST"))   resp = loginHandler(body);
+                else if (path.equals("/api/user/profile")       && method.equals("GET"))    resp = "{\"success\":true,\"username\":\"" + Database.esc(user) + "\"}";
+                else if (path.equals("/api/products")           && method.equals("GET"))    resp = productsJson();
                 else if (path.equals("/api/products")           && method.equals("POST"))   resp = addProductHandler(body);
                 else if (path.matches("/api/products/\\d+/stock") && method.equals("POST")) { Database.updateStock(seg(path,3),(int)num(body,"stockQty")); resp=ok(); }
                 else if (path.matches("/api/products/\\d+")     && method.equals("PUT"))    resp = updateProductHandler(seg(path,3), body);
@@ -412,6 +443,38 @@ public class Store {
                 else resp = "{\"error\":\"Not found\"}";
             } catch (Exception e) { resp = "{\"error\":\"" + Database.esc(e.getMessage()) + "\"}"; }
             sendJson(pw, resp);
+        }
+
+        String signupHandler(String body) throws StoreException {
+            String user = str(body, "username");
+            String pass = str(body, "password");
+            if (user.isEmpty() || pass.isEmpty()) return "{\"error\":\"Missing fields\"}";
+            try (Connection c = Database.conn(); PreparedStatement ps = c.prepareStatement("INSERT INTO users(username,password_hash) VALUES(?,?)")) {
+                ps.setString(1, user);
+                ps.setString(2, Database.hash(pass));
+                ps.executeUpdate();
+                return ok();
+            } catch (SQLException e) {
+                if (e.getMessage().contains("UNIQUE")) return "{\"error\":\"Username taken\"}";
+                throw new StoreException("Signup error", e);
+            }
+        }
+
+        String loginHandler(String body) throws StoreException {
+            String user = str(body, "username");
+            String pass = str(body, "password");
+            try (Connection c = Database.conn(); PreparedStatement ps = c.prepareStatement("SELECT * FROM users WHERE username=? AND password_hash=?")) {
+                ps.setString(1, user);
+                ps.setString(2, Database.hash(pass));
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) {
+                        String token = UUID.randomUUID().toString();
+                        Store.activeSessions.put(token, user);
+                        return "{\"success\":true,\"token\":\"" + token + "\",\"username\":\"" + Database.esc(user) + "\"}";
+                    }
+                    return "{\"error\":\"Invalid credentials\"}";
+                }
+            } catch (SQLException e) { throw new StoreException("Login error", e); }
         }
 
         String productsJson() throws StoreException {
