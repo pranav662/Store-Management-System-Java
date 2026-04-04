@@ -93,17 +93,12 @@ public class Store {
         static void init() throws StoreException {
             // try-with-resources exception handling
             try (Connection c = conn(); Statement s = c.createStatement()) {
-                s.execute("DROP TABLE IF EXISTS products");
-                s.execute("DROP TABLE IF EXISTS customers");
-                s.execute("DROP TABLE IF EXISTS bills");
-                s.execute("DROP TABLE IF EXISTS bill_items");
-                s.execute("DROP TABLE IF EXISTS users");
-                
                 s.execute("CREATE TABLE IF NOT EXISTS products(id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, name TEXT,category TEXT,price REAL,stock INTEGER,unit TEXT)");
                 s.execute("CREATE TABLE IF NOT EXISTS customers(id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, name TEXT,phone TEXT,email TEXT,address TEXT,created_at TEXT DEFAULT(datetime('now','localtime')))");
                 s.execute("CREATE TABLE IF NOT EXISTS bills(id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, customer_id INTEGER,customer_name TEXT,total_amount REAL,discount REAL DEFAULT 0,payment_method TEXT,bill_date TEXT DEFAULT(datetime('now','localtime')))");
                 s.execute("CREATE TABLE IF NOT EXISTS bill_items(id INTEGER PRIMARY KEY AUTOINCREMENT,bill_id INTEGER,product_id INTEGER,product_name TEXT,quantity INTEGER,unit_price REAL,subtotal REAL)");
-                s.execute("CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY AUTOINCREMENT,email TEXT UNIQUE,password_hash TEXT,created_at TEXT DEFAULT(datetime('now','localtime')))");
+                s.execute("CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY AUTOINCREMENT,username TEXT,email TEXT UNIQUE,password_hash TEXT,created_at TEXT DEFAULT(datetime('now','localtime')))");
+                try { s.execute("ALTER TABLE users ADD COLUMN username TEXT"); } catch (Exception ignored) {}
             } catch (SQLException e) { throw new StoreException("DB init failed: " + e.getMessage(), e); }
         }
 
@@ -400,6 +395,7 @@ public class Store {
                 if      (path.equals("/api/auth/signup")        && method.equals("POST"))   resp = signupHandler(body);
                 else if (path.equals("/api/auth/login")         && method.equals("POST"))   resp = loginHandler(body);
                 else if (path.equals("/api/user/profile")       && method.equals("GET"))    resp = profileHandler(userId);
+                else if (path.equals("/api/admin/users")        && method.equals("GET"))    resp = adminUsersList();
                 else if (path.equals("/api/products")           && method.equals("GET"))    resp = productsJson(userId);
                 else if (path.equals("/api/products")           && method.equals("POST"))   resp = addProductHandler(body, userId);
                 else if (path.matches("/api/products/\\d+/stock") && method.equals("POST")) { Database.updateStock(seg(path,3),(int)num(body,"stockQty"), userId); resp=ok(); }
@@ -419,14 +415,16 @@ public class Store {
         }
 
         String signupHandler(String body) throws StoreException {
+            String username = str(body, "username");
             String email = str(body, "email");
             String pass = str(body, "password");
-            if (email.isEmpty() || pass.isEmpty()) return "{\"error\":\"Missing fields\"}";
+            if (email.isEmpty() || pass.isEmpty() || username.isEmpty()) return "{\"error\":\"Missing fields\"}";
             if (!email.toLowerCase().endsWith("@gmail.com")) return "{\"error\":\"Only @gmail.com emails are allowed.\"}";
             
-            try (Connection c = Database.conn(); PreparedStatement ps = c.prepareStatement("INSERT INTO users(email,password_hash) VALUES(?,?)")) {
-                ps.setString(1, email);
-                ps.setString(2, Database.hash(pass));
+            try (Connection c = Database.conn(); PreparedStatement ps = c.prepareStatement("INSERT INTO users(username,email,password_hash) VALUES(?,?,?)")) {
+                ps.setString(1, username);
+                ps.setString(2, email);
+                ps.setString(3, Database.hash(pass));
                 ps.executeUpdate();
                 return ok();
             } catch (SQLException e) {
@@ -446,20 +444,37 @@ public class Store {
                     if (!correctHash.equals(Database.hash(pass))) return "{\"error\":\"Incorrect password.\"}";
                     
                     int userId = rsCheck.getInt("id");
+                    String username = rsCheck.getString("username");
                     String token = UUID.randomUUID().toString();
                     Store.activeSessions.put(token, userId);
-                    return "{\"success\":true,\"token\":\"" + token + "\",\"email\":\"" + Database.esc(email) + "\"}";
+                    return "{\"success\":true,\"token\":\"" + token + "\",\"username\":\"" + Database.esc(username) + "\"}";
                 }
             } catch (SQLException e) { throw new StoreException("Login error", e); }
         }
 
         String profileHandler(int userId) throws StoreException {
-            try (Connection c = Database.conn(); PreparedStatement ps = c.prepareStatement("SELECT email FROM users WHERE id=?")) {
+            try (Connection c = Database.conn(); PreparedStatement ps = c.prepareStatement("SELECT username, email FROM users WHERE id=?")) {
                 ps.setInt(1, userId);
                 ResultSet rs = ps.executeQuery();
-                if (rs.next()) return "{\"success\":true,\"email\":\"" + Database.esc(rs.getString("email")) + "\"}";
+                if (rs.next()) return "{\"success\":true,\"username\":\"" + Database.esc(rs.getString("username")) + "\",\"email\":\"" + Database.esc(rs.getString("email")) + "\"}";
                 return "{\"error\":\"User not found\"}";
             } catch (SQLException e) { throw new StoreException("Profile error", e); }
+        }
+
+        String adminUsersList() throws StoreException {
+            StringBuilder sb = new StringBuilder("[");
+            try (Connection c = Database.conn(); Statement st = c.createStatement(); ResultSet rs = st.executeQuery("SELECT id,username,email,created_at FROM users")) {
+                boolean first = true;
+                while(rs.next()){ 
+                    if(!first) sb.append(","); first = false; 
+                    sb.append("{\"id\":").append(rs.getInt(1))
+                      .append(",\"username\":\"").append(Database.esc(rs.getString(2)))
+                      .append("\",\"email\":\"").append(Database.esc(rs.getString(3)))
+                      .append("\",\"created_at\":\"").append(Database.esc(rs.getString(4)))
+                      .append("\"}"); 
+                }
+            } catch (SQLException e) { throw new StoreException("Admin Users Data", e); }
+            return sb.append("]").toString();
         }
 
         String productsJson(int userId) throws StoreException {

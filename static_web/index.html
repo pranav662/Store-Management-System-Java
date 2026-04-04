@@ -150,6 +150,10 @@ tbody td{padding:11px 14px;color:#cbd5e1;vertical-align:middle}
     <div style="text-align:center;font-size:40px;margin-bottom:8px">🛒</div>
     <h2 id="auth-title">Sign In</h2>
     <form id="auth-form">
+      <div class="form-group" id="group-username" style="margin-bottom:16px; display:none;">
+        <label>Username</label>
+        <input id="auth-username" type="text" autocomplete="off"/>
+      </div>
       <div class="form-group" style="margin-bottom:16px">
         <label>Email Address</label>
         <input id="auth-email" type="email" required autocomplete="off"/>
@@ -773,6 +777,8 @@ function attachToggle() {
     document.getElementById('auth-title').textContent = isSignup ? 'Create Account' : 'Sign In';
     document.getElementById('auth-submit').textContent = isSignup ? 'Sign Up' : 'Sign In';
     document.getElementById('auth-toggle').innerHTML = isSignup ? 'Already have an account? <span>Sign In</span>' : 'Don\'t have an account? <span>Sign Up</span>';
+    document.getElementById('group-username').style.display = isSignup ? 'block' : 'none';
+    document.getElementById('auth-username').required = isSignup;
     attachToggle();
   };
 }
@@ -780,13 +786,15 @@ attachToggle();
 
 document.getElementById('auth-form').onsubmit = async (e) => {
   e.preventDefault();
+  const un = document.getElementById('auth-username').value;
   const u = document.getElementById('auth-email').value;
   const p = document.getElementById('auth-pass').value;
   const endpoint = isSignup ? '/api/auth/signup' : '/api/auth/login';
+  const payload = isSignup ? {username:un, email:u, password:p} : {email:u, password:p};
   
   const res = await fetch(endpoint, {
     method: 'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({email:u, password:p})
+    body: JSON.stringify(payload)
   }).then(r => r.json());
 
   if (res.error) { toast(res.error, 'error'); return; }
@@ -796,7 +804,7 @@ document.getElementById('auth-form').onsubmit = async (e) => {
     document.getElementById('auth-toggle').querySelector('span').click();
   } else {
     localStorage.setItem('store_token', res.token);
-    document.getElementById('current-user').textContent = res.email;
+    document.getElementById('current-user').textContent = res.username;
     document.getElementById('auth-screen').style.display = 'none';
     toast('Welcome!');
     loadDashboard();
@@ -816,7 +824,7 @@ async function boot() {
   try {
     const res = await api('GET', '/api/user/profile');
     if (res.success) {
-      document.getElementById('current-user').textContent = res.email;
+      document.getElementById('current-user').textContent = res.username;
       document.getElementById('auth-screen').style.display = 'none';
       loadDashboard();
     }
