@@ -4,6 +4,7 @@
 [![SQLite](https://img.shields.io/badge/SQLite-07405E?style=for-the-badge&logo=sqlite&logoColor=white)](https://www.sqlite.org)
 [![HTML5](https://img.shields.io/badge/HTML5-E34F26?style=for-the-badge&logo=html5&logoColor=white)](https://developer.mozilla.org/en-US/docs/Web/Guide/HTML/HTML5)
 [![CSS3](https://img.shields.io/badge/CSS3-1572B6?style=for-the-badge&logo=css3&logoColor=white)](https://developer.mozilla.org/en-US/docs/Web/CSS)
+[![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/new)
 
 <div align="center">
   <img src="preview.png" alt="GroceryPro Dashboard Preview" width="100%">
@@ -16,6 +17,22 @@
 ---
 
 ## 🚀 Key Features
+
+### 📸 Feature Previews
+
+<div align="center">
+  <h4>Products & Inventory</h4>
+  <img src="preview_products.png" alt="Products Preview" width="80%">
+  <br><br>
+  <h4>Customer Management</h4>
+  <img src="preview_customers.png" alt="Customers Preview" width="80%">
+  <br><br>
+  <h4>Smart Billing</h4>
+  <img src="preview_billing.png" alt="Billing Preview" width="80%">
+  <br><br>
+  <h4>Transactional History</h4>
+  <img src="preview_history.png" alt="History Preview" width="80%">
+</div>
 
 ### 📊 Modern Dashboard
 - **Real-time Stats**: Track total products, customers, low stock items, and daily revenue at a glance.

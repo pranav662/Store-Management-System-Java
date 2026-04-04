@@ -15,8 +15,8 @@ import java.util.*;
  */
 public class Store {
 
-    static final String DB  = "jdbc:sqlite:store.db";
-    static final int    PORT = 8080;
+    static final String DB  = System.getenv("RAILWAY_ENVIRONMENT") != null ? "jdbc:sqlite:/app/data/store.db" : "jdbc:sqlite:store.db";
+    static final int    PORT = System.getenv("PORT") != null ? Integer.parseInt(System.getenv("PORT")) : 8080;
 
     // ══════════════════════════════════════════════════════════════════
     // OOP — Abstract base class (abstraction + encapsulation)
@@ -323,16 +323,21 @@ public class Store {
         private ServerSocket ss; private boolean running; final ControlPanel panel;
         HttpServer(ControlPanel p) { panel = p; }
 
+        void log(String msg) {
+            if (panel != null) panel.log(msg);
+            else System.out.println(msg);
+        }
+
         public void run() {
             running = true;
             try {
                 ss = new ServerSocket(PORT);
-                panel.log("Server running → http://localhost:" + PORT);
+                log("Server running → http://localhost:" + PORT);
                 while (running) {
                     Socket client = ss.accept();
                     new Thread(new RequestHandler(client, this)).start(); // new thread per request
                 }
-            } catch (IOException e) { if (running) panel.log("Server error: " + e.getMessage()); }
+            } catch (IOException e) { if (running) log("Server error: " + e.getMessage()); }
         }
 
         void stop() { running = false; try { if (ss != null) ss.close(); } catch (IOException e) {} }
@@ -378,11 +383,11 @@ public class Store {
                     body = new String(buf, 0, n);
                 }
 
-                server.panel.log(method + " " + path);
+                server.log(method + " " + path);
                 if (path.startsWith("/api/")) handleApi(method, path, body, pw);
                 else serveHtml(pw);
 
-            } catch (Exception e) { server.panel.log("Handler error: " + e.getMessage()); }
+            } catch (Exception e) { server.log("Handler error: " + e.getMessage()); }
             finally { try { socket.close(); } catch (Exception ignored) {} }
         }
 
@@ -642,7 +647,13 @@ public class Store {
         } catch (StoreException e) {
             System.err.println("Fatal: " + e.getMessage()); return;
         }
-        // Launch Swing GUI on the Event Dispatch Thread
-        SwingUtilities.invokeLater(() -> new ControlPanel().setVisible(true));
+        
+        if (java.awt.GraphicsEnvironment.isHeadless()) {
+            System.out.println("Headless environment detected. Starting server automatically...");
+            new Thread(new HttpServer(null)).start();
+        } else {
+            // Launch Swing GUI on the Event Dispatch Thread
+            SwingUtilities.invokeLater(() -> new ControlPanel().setVisible(true));
+        }
     }
 }
