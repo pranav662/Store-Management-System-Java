@@ -3,8 +3,4 @@
 README.md
 run.bat
 store.db
-preview*.png
-capture_previews.js
-package.json
-package-lock.json
-node_modules
+previews/

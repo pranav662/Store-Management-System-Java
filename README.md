@@ -7,7 +7,7 @@
 [![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/new)
 
 <div align="center">
-  <img src="preview.png" alt="GroceryPro Dashboard Preview" width="100%">
+  <img src="previews/preview_dashboard.png" alt="GroceryPro Dashboard Preview" width="100%">
   <br>
   <em>A sleek, glassmorphic dashboard powered entirely by a custom Java HTTP Server</em>
 </div>
@@ -22,16 +22,16 @@
 
 <div align="center">
   <h4>Products & Inventory</h4>
-  <img src="preview_products.png" alt="Products Preview" width="80%">
+  <img src="previews/preview_products.png" alt="Products Preview" width="80%">
   <br><br>
   <h4>Customer Management</h4>
-  <img src="preview_customers.png" alt="Customers Preview" width="80%">
+  <img src="previews/preview_customers.png" alt="Customers Preview" width="80%">
   <br><br>
   <h4>Smart Billing</h4>
-  <img src="preview_billing.png" alt="Billing Preview" width="80%">
+  <img src="previews/preview_billing.png" alt="Billing Preview" width="80%">
   <br><br>
   <h4>Transactional History</h4>
-  <img src="preview_history.png" alt="History Preview" width="80%">
+  <img src="previews/preview_history.png" alt="History Preview" width="80%">
 </div>
 
 ### 📊 Modern Dashboard
