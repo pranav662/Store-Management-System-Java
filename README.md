@@ -5,7 +5,13 @@
 [![HTML5](https://img.shields.io/badge/HTML5-E34F26?style=for-the-badge&logo=html5&logoColor=white)](https://developer.mozilla.org/en-US/docs/Web/Guide/HTML/HTML5)
 [![CSS3](https://img.shields.io/badge/CSS3-1572B6?style=for-the-badge&logo=css3&logoColor=white)](https://developer.mozilla.org/en-US/docs/Web/CSS)
 
-**GroceryPro** is a high-performance, single-file Java web application designed for modern store management. It features a custom multi-threaded HTTP server, a SQLite-backed persistence layer, and a sleek, glassmorphic web dashboard for managing inventory, customers, and billing.
+<div align="center">
+  <img src="preview.png" alt="GroceryPro Dashboard Preview" width="100%">
+  <br>
+  <em>A sleek, glassmorphic dashboard powered entirely by a custom Java HTTP Server</em>
+</div>
+
+**GroceryPro** is a high-performance, minimal-dependency Java web application designed for modern store management. Built completely from scratch without heavy web frameworks, it features a custom multi-threaded HTTP server (using standard Sockets), a robust SQLite-backed persistence layer, and a beautiful glassmorphic web dashboard for managing inventory, customers, and dynamic billing.
 
 ---
 
