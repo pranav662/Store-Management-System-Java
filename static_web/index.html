@@ -777,7 +777,7 @@ function attachToggle() {
     document.getElementById('auth-title').textContent = isSignup ? 'Create Account' : 'Sign In';
     document.getElementById('auth-submit').textContent = isSignup ? 'Sign Up' : 'Sign In';
     document.getElementById('auth-toggle').innerHTML = isSignup ? 'Already have an account? <span>Sign In</span>' : 'Don\'t have an account? <span>Sign Up</span>';
-    document.getElementById('group-email').style.display = isSignup ? 'block' : 'none';
+    document.getElementById('group-email').style.display = isSignup ? 'flex' : 'none';
     document.getElementById('auth-email').required = isSignup;
     attachToggle();
   };
