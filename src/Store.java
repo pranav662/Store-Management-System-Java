@@ -18,7 +18,7 @@ public class Store {
 
     static final String DB  = System.getenv("RAILWAY_ENVIRONMENT") != null ? "jdbc:sqlite:/app/data/store.db" : "jdbc:sqlite:store.db";
     static final int    PORT = System.getenv("PORT") != null ? Integer.parseInt(System.getenv("PORT")) : 8080;
-    static final Map<String, String> activeSessions = Collections.synchronizedMap(new HashMap<>());
+    static final Map<String, Integer> activeSessions = Collections.synchronizedMap(new HashMap<>());
 
     // ══════════════════════════════════════════════════════════════════
     // OOP — Abstract base class (abstraction + encapsulation)
@@ -93,134 +93,104 @@ public class Store {
         static void init() throws StoreException {
             // try-with-resources exception handling
             try (Connection c = conn(); Statement s = c.createStatement()) {
-                s.execute("CREATE TABLE IF NOT EXISTS products(id INTEGER PRIMARY KEY AUTOINCREMENT,name TEXT,category TEXT,price REAL,stock INTEGER,unit TEXT)");
-                s.execute("CREATE TABLE IF NOT EXISTS customers(id INTEGER PRIMARY KEY AUTOINCREMENT,name TEXT,phone TEXT,email TEXT,address TEXT,created_at TEXT DEFAULT(datetime('now','localtime')))");
-                s.execute("CREATE TABLE IF NOT EXISTS bills(id INTEGER PRIMARY KEY AUTOINCREMENT,customer_id INTEGER,customer_name TEXT,total_amount REAL,discount REAL DEFAULT 0,payment_method TEXT,bill_date TEXT DEFAULT(datetime('now','localtime')))");
+                s.execute("DROP TABLE IF EXISTS products");
+                s.execute("DROP TABLE IF EXISTS customers");
+                s.execute("DROP TABLE IF EXISTS bills");
+                s.execute("DROP TABLE IF EXISTS bill_items");
+                s.execute("DROP TABLE IF EXISTS users");
+                
+                s.execute("CREATE TABLE IF NOT EXISTS products(id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, name TEXT,category TEXT,price REAL,stock INTEGER,unit TEXT)");
+                s.execute("CREATE TABLE IF NOT EXISTS customers(id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, name TEXT,phone TEXT,email TEXT,address TEXT,created_at TEXT DEFAULT(datetime('now','localtime')))");
+                s.execute("CREATE TABLE IF NOT EXISTS bills(id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, customer_id INTEGER,customer_name TEXT,total_amount REAL,discount REAL DEFAULT 0,payment_method TEXT,bill_date TEXT DEFAULT(datetime('now','localtime')))");
                 s.execute("CREATE TABLE IF NOT EXISTS bill_items(id INTEGER PRIMARY KEY AUTOINCREMENT,bill_id INTEGER,product_id INTEGER,product_name TEXT,quantity INTEGER,unit_price REAL,subtotal REAL)");
-                s.execute("CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY AUTOINCREMENT,username TEXT UNIQUE,password_hash TEXT,created_at TEXT DEFAULT(datetime('now','localtime')))");
-                try (ResultSet r = s.executeQuery("SELECT count(*) FROM products")) {
-                    if (r.next() && r.getInt(1) == 0) seedProducts(c);
-                }
-                try (ResultSet r = s.executeQuery("SELECT count(*) FROM customers")) {
-                    if (r.next() && r.getInt(1) == 0) seedCustomers(c);
-                }
+                s.execute("CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY AUTOINCREMENT,email TEXT UNIQUE,password_hash TEXT,created_at TEXT DEFAULT(datetime('now','localtime')))");
             } catch (SQLException e) { throw new StoreException("DB init failed: " + e.getMessage(), e); }
         }
 
-        private static void seedProducts(Connection c) throws SQLException {
-            String sql = "INSERT INTO products(name,category,price,stock,unit)VALUES(?,?,?,?,?)";
-            Object[][] data = {
-                {"Rice", "Grains", 45.0, 100, "kg"}, {"Wheat Flour", "Grains", 35.0, 80, "kg"},
-                {"Sugar", "Sweeteners", 42.0, 60, "kg"}, {"Cooking Oil", "Oils", 120.0, 40, "liter"},
-                {"Salt", "Spices", 15.0, 50, "kg"}, {"Milk", "Dairy", 28.0, 30, "liter"},
-                {"Tomatoes", "Vegetables", 30.0, 25, "kg"}, {"Onions", "Vegetables", 20.0, 40, "kg"},
-                {"Lentils", "Legumes", 80.0, 50, "kg"}, {"Tea Powder", "Beverages", 180.0, 20, "pcs"}
-            };
-            for (Object[] row : data) {
-                try (PreparedStatement ps = c.prepareStatement(sql)) {
-                    ps.setString(1,(String)row[0]); ps.setString(2,(String)row[1]);
-                    ps.setDouble(3,(Double)row[2]);  ps.setInt(4,(Integer)row[3]); ps.setString(5,(String)row[4]);
-                    ps.executeUpdate();
-                }
-            }
-        }
-
-        private static void seedCustomers(Connection c) throws SQLException {
-            String sql = "INSERT INTO customers(name,phone,email,address)VALUES(?,?,?,?)";
-            Object[][] data = {
-                {"Rahul Sharma", "9876543210", "rahul@email.com", "12 MG Road, Pune"},
-                {"Priya Patel",  "9123456789", "priya@email.com", "45 Park St, Mumbai"},
-                {"Amit Kumar",   "8765432109", "amit@email.com",  "7 Lake View, Delhi"}
-            };
-            for (Object[] row : data) {
-                try (PreparedStatement ps = c.prepareStatement(sql)) {
-                    ps.setString(1,(String)row[0]); ps.setString(2,(String)row[1]);
-                    ps.setString(3,(String)row[2]); ps.setString(4,(String)row[3]);
-                    ps.executeUpdate();
-                }
-            }
-        }
-
         // ── Products ─────────────────────────────────────────────────
-        static List<GroceryProduct> getProducts() throws StoreException {
+        static List<GroceryProduct> getProducts(int userId) throws StoreException {
             List<GroceryProduct> list = new ArrayList<>();
-            try (Connection c = conn(); Statement s = c.createStatement();
-                 ResultSet rs = s.executeQuery("SELECT * FROM products ORDER BY name")) {
-                while (rs.next()) {
-                    list.add(new GroceryProduct(rs.getInt("id"), rs.getString("name"),
-                        rs.getDouble("price"), rs.getString("category"), rs.getString("unit"), rs.getInt("stock")));
+            try (Connection c = conn(); PreparedStatement ps = c.prepareStatement("SELECT * FROM products WHERE user_id=? ORDER BY name")) {
+                ps.setInt(1, userId);
+                try (ResultSet rs = ps.executeQuery()) {
+                    while (rs.next()) {
+                        list.add(new GroceryProduct(rs.getInt("id"), rs.getString("name"),
+                            rs.getDouble("price"), rs.getString("category"), rs.getString("unit"), rs.getInt("stock")));
+                    }
                 }
             } catch (SQLException e) { throw new StoreException("Fetch products: " + e.getMessage(), e); }
             return list;
         }
 
-        static void addProduct(GroceryProduct p) throws StoreException {
+        static void addProduct(GroceryProduct p, int userId) throws StoreException {
             try (Connection c = conn(); PreparedStatement ps = c.prepareStatement(
-                    "INSERT INTO products(name,category,price,stock,unit)VALUES(?,?,?,?,?)")) {
-                ps.setString(1,p.getName()); ps.setString(2,p.category); ps.setDouble(3,p.getPrice());
-                ps.setInt(4,p.stock);        ps.setString(5,p.unit);     ps.executeUpdate();
+                    "INSERT INTO products(user_id,name,category,price,stock,unit)VALUES(?,?,?,?,?,?)")) {
+                ps.setInt(1,userId); ps.setString(2,p.getName()); ps.setString(3,p.category); ps.setDouble(4,p.getPrice());
+                ps.setInt(5,p.stock);        ps.setString(6,p.unit);     ps.executeUpdate();
             } catch (SQLException e) { throw new StoreException("Add product: " + e.getMessage(), e); }
         }
 
-        static void updateStock(int id, int qty) throws StoreException {
-            try (Connection c = conn(); PreparedStatement ps = c.prepareStatement("UPDATE products SET stock=? WHERE id=?")) {
-                ps.setInt(1,qty); ps.setInt(2,id); ps.executeUpdate();
+        static void updateStock(int id, int qty, int userId) throws StoreException {
+            try (Connection c = conn(); PreparedStatement ps = c.prepareStatement("UPDATE products SET stock=? WHERE id=? AND user_id=?")) {
+                ps.setInt(1,qty); ps.setInt(2,id); ps.setInt(3,userId); ps.executeUpdate();
             } catch (SQLException e) { throw new StoreException("Update stock", e); }
         }
 
-        static void updateProduct(GroceryProduct p) throws StoreException {
+        static void updateProduct(GroceryProduct p, int userId) throws StoreException {
             try (Connection c = conn(); PreparedStatement ps = c.prepareStatement(
-                    "UPDATE products SET name=?, category=?, price=?, unit=? WHERE id=?")) {
+                    "UPDATE products SET name=?, category=?, price=?, unit=? WHERE id=? AND user_id=?")) {
                 ps.setString(1,p.getName()); ps.setString(2,p.category); ps.setDouble(3,p.getPrice());
-                ps.setString(4,p.unit);       ps.setInt(5,p.getId());    ps.executeUpdate();
+                ps.setString(4,p.unit);       ps.setInt(5,p.getId());    ps.setInt(6,userId); ps.executeUpdate();
             } catch (SQLException e) { throw new StoreException("Update product: " + e.getMessage(), e); }
         }
 
-        static void deleteProduct(int id) throws StoreException {
-            try (Connection c = conn(); PreparedStatement ps = c.prepareStatement("DELETE FROM products WHERE id=?")) {
-                ps.setInt(1,id); ps.executeUpdate();
+        static void deleteProduct(int id, int userId) throws StoreException {
+            try (Connection c = conn(); PreparedStatement ps = c.prepareStatement("DELETE FROM products WHERE id=? AND user_id=?")) {
+                ps.setInt(1,id); ps.setInt(2,userId); ps.executeUpdate();
             } catch (SQLException e) { throw new StoreException("Delete product", e); }
         }
 
         // ── Customers ─────────────────────────────────────────────────
-        static List<Customer> getCustomers() throws StoreException {
+        static List<Customer> getCustomers(int userId) throws StoreException {
             List<Customer> list = new ArrayList<>();
-            try (Connection c = conn(); Statement s = c.createStatement();
-                 ResultSet rs = s.executeQuery("SELECT * FROM customers ORDER BY name")) {
-                while (rs.next()) {
-                    Customer cu = new Customer(rs.getInt("id"), rs.getString("name"),
-                        rs.getString("phone"), rs.getString("email"), rs.getString("address"));
-                    cu.createdAt = rs.getString("created_at"); list.add(cu);
+            try (Connection c = conn(); PreparedStatement ps = c.prepareStatement("SELECT * FROM customers WHERE user_id=? ORDER BY name")) {
+                ps.setInt(1,userId);
+                try (ResultSet rs = ps.executeQuery()) {
+                    while (rs.next()) {
+                        Customer cu = new Customer(rs.getInt("id"), rs.getString("name"),
+                            rs.getString("phone"), rs.getString("email"), rs.getString("address"));
+                        cu.createdAt = rs.getString("created_at"); list.add(cu);
+                    }
                 }
             } catch (SQLException e) { throw new StoreException("Fetch customers", e); }
             return list;
         }
 
-        static void addCustomer(Customer cu) throws StoreException {
+        static void addCustomer(Customer cu, int userId) throws StoreException {
             try (Connection c = conn(); PreparedStatement ps = c.prepareStatement(
-                    "INSERT INTO customers(name,phone,email,address)VALUES(?,?,?,?)")) {
-                ps.setString(1,cu.name); ps.setString(2,cu.phone);
-                ps.setString(3,cu.email); ps.setString(4,cu.address); ps.executeUpdate();
+                    "INSERT INTO customers(user_id,name,phone,email,address)VALUES(?,?,?,?,?)")) {
+                ps.setInt(1,userId); ps.setString(2,cu.name); ps.setString(3,cu.phone);
+                ps.setString(4,cu.email); ps.setString(5,cu.address); ps.executeUpdate();
             } catch (SQLException e) { throw new StoreException("Add customer", e); }
         }
 
-        static void deleteCustomer(int id) throws StoreException {
-            try (Connection c = conn(); PreparedStatement ps = c.prepareStatement("DELETE FROM customers WHERE id=?")) {
-                ps.setInt(1,id); ps.executeUpdate();
+        static void deleteCustomer(int id, int userId) throws StoreException {
+            try (Connection c = conn(); PreparedStatement ps = c.prepareStatement("DELETE FROM customers WHERE id=? AND user_id=?")) {
+                ps.setInt(1,id); ps.setInt(2,userId); ps.executeUpdate();
             } catch (SQLException e) { throw new StoreException("Delete customer", e); }
         }
 
         // ── Bills (with JDBC transaction) ─────────────────────────────
-        static int createBill(Bill bill) throws StoreException {
+        static int createBill(Bill bill, int userId) throws StoreException {
             Connection c = null;
             try {
                 c = conn(); c.setAutoCommit(false);
                 PreparedStatement ps = c.prepareStatement(
-                    "INSERT INTO bills(customer_id,customer_name,total_amount,discount,payment_method)VALUES(?,?,?,?,?)",
+                    "INSERT INTO bills(user_id,customer_id,customer_name,total_amount,discount,payment_method)VALUES(?,?,?,?,?,?)",
                     Statement.RETURN_GENERATED_KEYS);
-                ps.setInt(1,bill.customerId); ps.setString(2,bill.customerName);
-                ps.setDouble(3,bill.totalAmount); ps.setDouble(4,bill.discount);
-                ps.setString(5,bill.paymentMethod); ps.executeUpdate();
+                ps.setInt(1,userId); ps.setInt(2,bill.customerId); ps.setString(3,bill.customerName);
+                ps.setDouble(4,bill.totalAmount); ps.setDouble(5,bill.discount);
+                ps.setString(6,bill.paymentMethod); ps.executeUpdate();
                 ResultSet keys = ps.getGeneratedKeys();
                 int billId = keys.next() ? keys.getInt(1) : -1;
                 for (BillItem item : bill.items) {
@@ -229,8 +199,8 @@ public class Store {
                     ip.setInt(1,billId); ip.setInt(2,item.productId); ip.setString(3,item.productName);
                     ip.setInt(4,item.quantity); ip.setDouble(5,item.unitPrice); ip.setDouble(6,item.subtotal);
                     ip.executeUpdate();
-                    PreparedStatement sp = c.prepareStatement("UPDATE products SET stock=stock-? WHERE id=?");
-                    sp.setInt(1,item.quantity); sp.setInt(2,item.productId); sp.executeUpdate();
+                    PreparedStatement sp = c.prepareStatement("UPDATE products SET stock=stock-? WHERE id=? AND user_id=?");
+                    sp.setInt(1,item.quantity); sp.setInt(2,item.productId); sp.setInt(3,userId); sp.executeUpdate();
                 }
                 c.commit(); return billId;
             } catch (SQLException e) {
@@ -241,19 +211,21 @@ public class Store {
             }
         }
 
-        static List<Bill> getBills() throws StoreException {
+        static List<Bill> getBills(int userId) throws StoreException {
             List<Bill> list = new ArrayList<>();
-            try (Connection c = conn(); Statement s = c.createStatement();
-                 ResultSet rs = s.executeQuery("SELECT * FROM bills ORDER BY id DESC")) {
-                while (rs.next()) list.add(mapBill(rs));
+            try (Connection c = conn(); PreparedStatement ps = c.prepareStatement("SELECT * FROM bills WHERE user_id=? ORDER BY id DESC")) {
+                ps.setInt(1,userId);
+                try (ResultSet rs = ps.executeQuery()) {
+                    while (rs.next()) list.add(mapBill(rs));
+                }
             } catch (SQLException e) { throw new StoreException("Fetch bills", e); }
             return list;
         }
 
-        static Bill getBillById(int id) throws StoreException {
+        static Bill getBillById(int id, int userId) throws StoreException {
             try (Connection c = conn()) {
-                PreparedStatement ps = c.prepareStatement("SELECT * FROM bills WHERE id=?");
-                ps.setInt(1,id); ResultSet rs = ps.executeQuery();
+                PreparedStatement ps = c.prepareStatement("SELECT * FROM bills WHERE id=? AND user_id=?");
+                ps.setInt(1,id); ps.setInt(2,userId); ResultSet rs = ps.executeQuery();
                 if (!rs.next()) return null;
                 Bill bill = mapBill(rs);
                 PreparedStatement ip = c.prepareStatement("SELECT * FROM bill_items WHERE bill_id=?");
@@ -268,25 +240,26 @@ public class Store {
             } catch (SQLException e) { throw new StoreException("Get bill", e); }
         }
 
-        static List<Bill> getBillsByCustomer(int cid) throws StoreException {
+        static List<Bill> getBillsByCustomer(int cid, int userId) throws StoreException {
             List<Bill> list = new ArrayList<>();
             try (Connection c = conn(); PreparedStatement ps = c.prepareStatement(
-                    "SELECT * FROM bills WHERE customer_id=? ORDER BY id DESC")) {
-                ps.setInt(1,cid); ResultSet rs = ps.executeQuery();
+                    "SELECT * FROM bills WHERE customer_id=? AND user_id=? ORDER BY id DESC")) {
+                ps.setInt(1,cid); ps.setInt(2,userId); ResultSet rs = ps.executeQuery();
                 while (rs.next()) list.add(mapBill(rs));
             } catch (SQLException e) { throw new StoreException("Customer bills", e); }
             return list;
         }
 
-        static String dashboard() throws StoreException {
+        static String dashboard(int userId) throws StoreException {
             try (Connection c = conn()) {
-                int tp, tc, ls; double rev;
-                try (Statement s=c.createStatement(); ResultSet r=s.executeQuery("SELECT count(*) FROM products")) { tp=r.next()?r.getInt(1):0; }
-                try (Statement s=c.createStatement(); ResultSet r=s.executeQuery("SELECT count(*) FROM customers")) { tc=r.next()?r.getInt(1):0; }
-                try (Statement s=c.createStatement(); ResultSet r=s.executeQuery("SELECT count(*) FROM products WHERE stock<=10")) { ls=r.next()?r.getInt(1):0; }
-                try (Statement s=c.createStatement(); ResultSet r=s.executeQuery("SELECT COALESCE(SUM(total_amount),0) FROM bills WHERE date(bill_date)=date('now','localtime')")) { rev=r.next()?r.getDouble(1):0; }
+                int tp=0, tc=0, ls=0; double rev=0;
+                try (PreparedStatement s=c.prepareStatement("SELECT count(*) FROM products WHERE user_id=?")) { s.setInt(1,userId); ResultSet r=s.executeQuery(); tp=r.next()?r.getInt(1):0; }
+                try (PreparedStatement s=c.prepareStatement("SELECT count(*) FROM customers WHERE user_id=?")) { s.setInt(1,userId); ResultSet r=s.executeQuery(); tc=r.next()?r.getInt(1):0; }
+                try (PreparedStatement s=c.prepareStatement("SELECT count(*) FROM products WHERE stock<=10 AND user_id=?")) { s.setInt(1,userId); ResultSet r=s.executeQuery(); ls=r.next()?r.getInt(1):0; }
+                try (PreparedStatement s=c.prepareStatement("SELECT COALESCE(SUM(total_amount),0) FROM bills WHERE date(bill_date)=date('now','localtime') AND user_id=?")) { s.setInt(1,userId); ResultSet r=s.executeQuery(); rev=r.next()?r.getDouble(1):0; }
                 StringBuilder recent = new StringBuilder("[");
-                try (Statement s=c.createStatement(); ResultSet r=s.executeQuery("SELECT * FROM bills ORDER BY id DESC LIMIT 5")) {
+                try (PreparedStatement s=c.prepareStatement("SELECT * FROM bills WHERE user_id=? ORDER BY id DESC LIMIT 5")) {
+                    s.setInt(1,userId); ResultSet r=s.executeQuery();
                     boolean first = true;
                     while (r.next()) {
                         if (!first) recent.append(","); first = false;
@@ -415,9 +388,9 @@ public class Store {
             String resp;
             try {
                 boolean isAuthRoute = path.startsWith("/api/auth/");
-                String user = token != null ? Store.activeSessions.get(token) : null;
+                Integer userId = token != null ? Store.activeSessions.get(token) : null;
                 
-                if (!isAuthRoute && user == null) {
+                if (!isAuthRoute && userId == null) {
                     pw.print("HTTP/1.1 401 Unauthorized\r\nContent-Type: application/json; charset=utf-8\r\nAccess-Control-Allow-Origin: *\r\n\r\n{\"error\":\"Unauthorized\"}");
                     pw.flush();
                     return;
@@ -426,59 +399,71 @@ public class Store {
                 // switch-like if/else routing
                 if      (path.equals("/api/auth/signup")        && method.equals("POST"))   resp = signupHandler(body);
                 else if (path.equals("/api/auth/login")         && method.equals("POST"))   resp = loginHandler(body);
-                else if (path.equals("/api/user/profile")       && method.equals("GET"))    resp = "{\"success\":true,\"username\":\"" + Database.esc(user) + "\"}";
-                else if (path.equals("/api/products")           && method.equals("GET"))    resp = productsJson();
-                else if (path.equals("/api/products")           && method.equals("POST"))   resp = addProductHandler(body);
-                else if (path.matches("/api/products/\\d+/stock") && method.equals("POST")) { Database.updateStock(seg(path,3),(int)num(body,"stockQty")); resp=ok(); }
-                else if (path.matches("/api/products/\\d+")     && method.equals("PUT"))    resp = updateProductHandler(seg(path,3), body);
-                else if (path.matches("/api/products/\\d+")     && method.equals("DELETE")) { Database.deleteProduct(seg(path,3)); resp=ok(); }
-                else if (path.equals("/api/customers")          && method.equals("GET"))    resp = customersJson();
-                else if (path.equals("/api/customers")          && method.equals("POST"))   resp = addCustomerHandler(body);
-                else if (path.matches("/api/customers/\\d+")    && method.equals("DELETE")) { Database.deleteCustomer(seg(path,3)); resp=ok(); }
-                else if (path.matches("/api/customers/\\d+/bills") && method.equals("GET")) resp = billsJson(Database.getBillsByCustomer(seg(path,3)));
-                else if (path.equals("/api/bills")              && method.equals("GET"))    resp = billsJson(Database.getBills());
-                else if (path.equals("/api/bills")              && method.equals("POST"))   resp = createBillHandler(body);
-                else if (path.matches("/api/bills/\\d+")        && method.equals("GET"))    { Bill b=Database.getBillById(seg(path,3)); resp=b!=null?billDetailJson(b):"{\"error\":\"not found\"}"; }
-                else if (path.equals("/api/dashboard")          && method.equals("GET"))    resp = Database.dashboard();
+                else if (path.equals("/api/user/profile")       && method.equals("GET"))    resp = profileHandler(userId);
+                else if (path.equals("/api/products")           && method.equals("GET"))    resp = productsJson(userId);
+                else if (path.equals("/api/products")           && method.equals("POST"))   resp = addProductHandler(body, userId);
+                else if (path.matches("/api/products/\\d+/stock") && method.equals("POST")) { Database.updateStock(seg(path,3),(int)num(body,"stockQty"), userId); resp=ok(); }
+                else if (path.matches("/api/products/\\d+")     && method.equals("PUT"))    resp = updateProductHandler(seg(path,3), body, userId);
+                else if (path.matches("/api/products/\\d+")     && method.equals("DELETE")) { Database.deleteProduct(seg(path,3), userId); resp=ok(); }
+                else if (path.equals("/api/customers")          && method.equals("GET"))    resp = customersJson(userId);
+                else if (path.equals("/api/customers")          && method.equals("POST"))   resp = addCustomerHandler(body, userId);
+                else if (path.matches("/api/customers/\\d+")    && method.equals("DELETE")) { Database.deleteCustomer(seg(path,3), userId); resp=ok(); }
+                else if (path.matches("/api/customers/\\d+/bills") && method.equals("GET")) resp = billsJson(Database.getBillsByCustomer(seg(path,3), userId));
+                else if (path.equals("/api/bills")              && method.equals("GET"))    resp = billsJson(Database.getBills(userId));
+                else if (path.equals("/api/bills")              && method.equals("POST"))   resp = createBillHandler(body, userId);
+                else if (path.matches("/api/bills/\\d+")        && method.equals("GET"))    { Bill b=Database.getBillById(seg(path,3), userId); resp=b!=null?billDetailJson(b):"{\"error\":\"not found\"}"; }
+                else if (path.equals("/api/dashboard")          && method.equals("GET"))    resp = Database.dashboard(userId);
                 else resp = "{\"error\":\"Not found\"}";
             } catch (Exception e) { resp = "{\"error\":\"" + Database.esc(e.getMessage()) + "\"}"; }
             sendJson(pw, resp);
         }
 
         String signupHandler(String body) throws StoreException {
-            String user = str(body, "username");
+            String email = str(body, "email");
             String pass = str(body, "password");
-            if (user.isEmpty() || pass.isEmpty()) return "{\"error\":\"Missing fields\"}";
-            try (Connection c = Database.conn(); PreparedStatement ps = c.prepareStatement("INSERT INTO users(username,password_hash) VALUES(?,?)")) {
-                ps.setString(1, user);
+            if (email.isEmpty() || pass.isEmpty()) return "{\"error\":\"Missing fields\"}";
+            if (!email.toLowerCase().endsWith("@gmail.com")) return "{\"error\":\"Only @gmail.com emails are allowed.\"}";
+            
+            try (Connection c = Database.conn(); PreparedStatement ps = c.prepareStatement("INSERT INTO users(email,password_hash) VALUES(?,?)")) {
+                ps.setString(1, email);
                 ps.setString(2, Database.hash(pass));
                 ps.executeUpdate();
                 return ok();
             } catch (SQLException e) {
-                if (e.getMessage().contains("UNIQUE")) return "{\"error\":\"Username taken\"}";
+                if (e.getMessage().contains("UNIQUE")) return "{\"error\":\"Email already registered.\"}";
                 throw new StoreException("Signup error", e);
             }
         }
 
         String loginHandler(String body) throws StoreException {
-            String user = str(body, "username");
+            String email = str(body, "email");
             String pass = str(body, "password");
-            try (Connection c = Database.conn(); PreparedStatement ps = c.prepareStatement("SELECT * FROM users WHERE username=? AND password_hash=?")) {
-                ps.setString(1, user);
-                ps.setString(2, Database.hash(pass));
-                try (ResultSet rs = ps.executeQuery()) {
-                    if (rs.next()) {
-                        String token = UUID.randomUUID().toString();
-                        Store.activeSessions.put(token, user);
-                        return "{\"success\":true,\"token\":\"" + token + "\",\"username\":\"" + Database.esc(user) + "\"}";
-                    }
-                    return "{\"error\":\"Invalid credentials\"}";
+            try (Connection c = Database.conn(); PreparedStatement psCheck = c.prepareStatement("SELECT * FROM users WHERE email=?")) {
+                psCheck.setString(1, email);
+                try (ResultSet rsCheck = psCheck.executeQuery()) {
+                    if (!rsCheck.next()) return "{\"error\":\"Account does not exist.\"}";
+                    String correctHash = rsCheck.getString("password_hash");
+                    if (!correctHash.equals(Database.hash(pass))) return "{\"error\":\"Incorrect password.\"}";
+                    
+                    int userId = rsCheck.getInt("id");
+                    String token = UUID.randomUUID().toString();
+                    Store.activeSessions.put(token, userId);
+                    return "{\"success\":true,\"token\":\"" + token + "\",\"email\":\"" + Database.esc(email) + "\"}";
                 }
             } catch (SQLException e) { throw new StoreException("Login error", e); }
         }
 
-        String productsJson() throws StoreException {
-            List<GroceryProduct> list = Database.getProducts();
+        String profileHandler(int userId) throws StoreException {
+            try (Connection c = Database.conn(); PreparedStatement ps = c.prepareStatement("SELECT email FROM users WHERE id=?")) {
+                ps.setInt(1, userId);
+                ResultSet rs = ps.executeQuery();
+                if (rs.next()) return "{\"success\":true,\"email\":\"" + Database.esc(rs.getString("email")) + "\"}";
+                return "{\"error\":\"User not found\"}";
+            } catch (SQLException e) { throw new StoreException("Profile error", e); }
+        }
+
+        String productsJson(int userId) throws StoreException {
+            List<GroceryProduct> list = Database.getProducts(userId);
             StringBuilder sb = new StringBuilder("[");
             for (int i = 0; i < list.size(); i++) {
                 GroceryProduct p = list.get(i);
@@ -493,22 +478,22 @@ public class Store {
             return sb.append("]").toString();
         }
 
-        String addProductHandler(String body) throws StoreException {
+        String addProductHandler(String body, int userId) throws StoreException {
             GroceryProduct p = new GroceryProduct();
             p.setName(str(body,"name")); p.category = str(body,"category");
             p.setPrice(num(body,"price")); p.stock = (int)num(body,"stockQty"); p.unit = str(body,"unit");
-            Database.addProduct(p); return ok();
+            Database.addProduct(p, userId); return ok();
         }
 
-        String updateProductHandler(int id, String body) throws StoreException {
+        String updateProductHandler(int id, String body, int userId) throws StoreException {
             GroceryProduct p = new GroceryProduct();
             p.setId(id); p.setName(str(body,"name")); p.category = str(body,"category");
             p.setPrice(num(body,"price")); p.unit = str(body,"unit");
-            Database.updateProduct(p); return ok();
+            Database.updateProduct(p, userId); return ok();
         }
 
-        String customersJson() throws StoreException {
-            List<Customer> list = Database.getCustomers();
+        String customersJson(int userId) throws StoreException {
+            List<Customer> list = Database.getCustomers(userId);
             StringBuilder sb = new StringBuilder("[");
             for (int i = 0; i < list.size(); i++) {
                 Customer c = list.get(i);
@@ -523,11 +508,11 @@ public class Store {
             return sb.append("]").toString();
         }
 
-        String addCustomerHandler(String body) throws StoreException {
+        String addCustomerHandler(String body, int userId) throws StoreException {
             Customer cu = new Customer();
             cu.name = str(body,"name"); cu.phone = str(body,"phone");
             cu.email = str(body,"email"); cu.address = str(body,"address");
-            Database.addCustomer(cu); return ok();
+            Database.addCustomer(cu, userId); return ok();
         }
 
         String billsJson(List<Bill> bills) {
@@ -559,7 +544,7 @@ public class Store {
             return sb.append("]}").toString();
         }
 
-        String createBillHandler(String body) throws StoreException {
+        String createBillHandler(String body, int userId) throws StoreException {
             Bill bill = new Bill();
             bill.customerId   = (int)num(body,"customerId");
             bill.customerName = str(body,"customerName");
@@ -572,7 +557,7 @@ public class Store {
                 it.quantity    = (int)num(obj,"quantity");     it.unitPrice   = num(obj,"unitPrice");
                 it.subtotal    = num(obj,"subtotal");          bill.items.add(it);
             }
-            int id = Database.createBill(bill);
+            int id = Database.createBill(bill, userId);
             return "{\"success\":true,\"billId\":"+id+"}";
         }
 
