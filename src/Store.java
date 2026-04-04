@@ -421,6 +421,11 @@ public class Store {
             if (email.isEmpty() || pass.isEmpty() || username.isEmpty()) return "{\"error\":\"Missing fields\"}";
             if (!email.toLowerCase().endsWith("@gmail.com")) return "{\"error\":\"Only @gmail.com emails are allowed.\"}";
             
+            try (Connection cCheck = Database.conn(); PreparedStatement psCheck = cCheck.prepareStatement("SELECT id FROM users WHERE username=?")) {
+                psCheck.setString(1, username);
+                if (psCheck.executeQuery().next()) return "{\"error\":\"Username already taken.\"}";
+            } catch (SQLException e) { throw new StoreException("Username check", e); }
+            
             try (Connection c = Database.conn(); PreparedStatement ps = c.prepareStatement("INSERT INTO users(username,email,password_hash) VALUES(?,?,?)")) {
                 ps.setString(1, username);
                 ps.setString(2, email);
@@ -434,17 +439,16 @@ public class Store {
         }
 
         String loginHandler(String body) throws StoreException {
-            String email = str(body, "email");
+            String username = str(body, "username");
             String pass = str(body, "password");
-            try (Connection c = Database.conn(); PreparedStatement psCheck = c.prepareStatement("SELECT * FROM users WHERE email=?")) {
-                psCheck.setString(1, email);
+            try (Connection c = Database.conn(); PreparedStatement psCheck = c.prepareStatement("SELECT * FROM users WHERE username=?")) {
+                psCheck.setString(1, username);
                 try (ResultSet rsCheck = psCheck.executeQuery()) {
                     if (!rsCheck.next()) return "{\"error\":\"Account does not exist.\"}";
                     String correctHash = rsCheck.getString("password_hash");
                     if (!correctHash.equals(Database.hash(pass))) return "{\"error\":\"Incorrect password.\"}";
                     
                     int userId = rsCheck.getInt("id");
-                    String username = rsCheck.getString("username");
                     String token = UUID.randomUUID().toString();
                     Store.activeSessions.put(token, userId);
                     return "{\"success\":true,\"token\":\"" + token + "\",\"username\":\"" + Database.esc(username) + "\"}";
