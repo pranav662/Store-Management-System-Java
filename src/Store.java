@@ -16,7 +16,7 @@ import java.security.MessageDigest;
  */
 public class Store {
 
-    static final String DB  = System.getenv("RAILWAY_ENVIRONMENT") != null ? "jdbc:sqlite:/app/data/store.db" : "jdbc:sqlite:store.db";
+    static final String DB  = System.getenv("MYSQL_URL") != null ? System.getenv("MYSQL_URL") : "jdbc:mysql://localhost:3306/store";
     static final int    PORT = System.getenv("PORT") != null ? Integer.parseInt(System.getenv("PORT")) : 8080;
     static final Map<String, Integer> activeSessions = Collections.synchronizedMap(new HashMap<>());
 
@@ -93,12 +93,11 @@ public class Store {
         static void init() throws StoreException {
             // try-with-resources exception handling
             try (Connection c = conn(); Statement s = c.createStatement()) {
-                s.execute("CREATE TABLE IF NOT EXISTS products(id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, name TEXT,category TEXT,price REAL,stock INTEGER,unit TEXT)");
-                s.execute("CREATE TABLE IF NOT EXISTS customers(id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, name TEXT,phone TEXT,email TEXT,address TEXT,created_at TEXT DEFAULT(datetime('now','localtime')))");
-                s.execute("CREATE TABLE IF NOT EXISTS bills(id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, customer_id INTEGER,customer_name TEXT,total_amount REAL,discount REAL DEFAULT 0,payment_method TEXT,bill_date TEXT DEFAULT(datetime('now','localtime')))");
-                s.execute("CREATE TABLE IF NOT EXISTS bill_items(id INTEGER PRIMARY KEY AUTOINCREMENT,bill_id INTEGER,product_id INTEGER,product_name TEXT,quantity INTEGER,unit_price REAL,subtotal REAL)");
-                s.execute("CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY AUTOINCREMENT,username TEXT,email TEXT UNIQUE,password_hash TEXT,created_at TEXT DEFAULT(datetime('now','localtime')))");
-                try { s.execute("ALTER TABLE users ADD COLUMN username TEXT"); } catch (Exception ignored) {}
+                s.execute("CREATE TABLE IF NOT EXISTS products(id INT PRIMARY KEY AUTO_INCREMENT, user_id INT, name VARCHAR(255),category VARCHAR(255),price DOUBLE,stock INT,unit VARCHAR(50))");
+                s.execute("CREATE TABLE IF NOT EXISTS customers(id INT PRIMARY KEY AUTO_INCREMENT, user_id INT, name VARCHAR(255),phone VARCHAR(50),email VARCHAR(255),address TEXT,created_at DATETIME DEFAULT CURRENT_TIMESTAMP)");
+                s.execute("CREATE TABLE IF NOT EXISTS bills(id INT PRIMARY KEY AUTO_INCREMENT, user_id INT, customer_id INT,customer_name VARCHAR(255),total_amount DOUBLE,discount DOUBLE DEFAULT 0,payment_method VARCHAR(50),bill_date DATETIME DEFAULT CURRENT_TIMESTAMP)");
+                s.execute("CREATE TABLE IF NOT EXISTS bill_items(id INT PRIMARY KEY AUTO_INCREMENT,bill_id INT,product_id INT,product_name VARCHAR(255),quantity INT,unit_price DOUBLE,subtotal DOUBLE)");
+                s.execute("CREATE TABLE IF NOT EXISTS users(id INT PRIMARY KEY AUTO_INCREMENT,username VARCHAR(255),email VARCHAR(255) UNIQUE,password_hash VARCHAR(255),created_at DATETIME DEFAULT CURRENT_TIMESTAMP)");
             } catch (SQLException e) { throw new StoreException("DB init failed: " + e.getMessage(), e); }
         }
 
@@ -251,7 +250,7 @@ public class Store {
                 try (PreparedStatement s=c.prepareStatement("SELECT count(*) FROM products WHERE user_id=?")) { s.setInt(1,userId); ResultSet r=s.executeQuery(); tp=r.next()?r.getInt(1):0; }
                 try (PreparedStatement s=c.prepareStatement("SELECT count(*) FROM customers WHERE user_id=?")) { s.setInt(1,userId); ResultSet r=s.executeQuery(); tc=r.next()?r.getInt(1):0; }
                 try (PreparedStatement s=c.prepareStatement("SELECT count(*) FROM products WHERE stock<=10 AND user_id=?")) { s.setInt(1,userId); ResultSet r=s.executeQuery(); ls=r.next()?r.getInt(1):0; }
-                try (PreparedStatement s=c.prepareStatement("SELECT COALESCE(SUM(total_amount),0) FROM bills WHERE date(bill_date)=date('now','localtime') AND user_id=?")) { s.setInt(1,userId); ResultSet r=s.executeQuery(); rev=r.next()?r.getDouble(1):0; }
+                try (PreparedStatement s=c.prepareStatement("SELECT COALESCE(SUM(total_amount),0) FROM bills WHERE DATE(bill_date)=CURDATE() AND user_id=?")) { s.setInt(1,userId); ResultSet r=s.executeQuery(); rev=r.next()?r.getDouble(1):0; }
                 StringBuilder recent = new StringBuilder("[");
                 try (PreparedStatement s=c.prepareStatement("SELECT * FROM bills WHERE user_id=? ORDER BY id DESC LIMIT 5")) {
                     s.setInt(1,userId); ResultSet r=s.executeQuery();
@@ -284,7 +283,10 @@ public class Store {
             return s.replace("\\","\\\\").replace("\"","\\\"").replace("\n","\\n").replace("\r","");
         }
 
-        private static Connection conn() throws SQLException { return DriverManager.getConnection(DB); }
+        private static Connection conn() throws SQLException {
+            try { Class.forName("com.mysql.cj.jdbc.Driver"); } catch (ClassNotFoundException e) { throw new SQLException("MySQL JDBC driver not found", e); }
+            return DriverManager.getConnection(DB);
+        }
         
         static String hash(String plain) throws StoreException {
             try {
@@ -473,7 +475,7 @@ public class Store {
                 ps.executeUpdate();
                 return ok();
             } catch (SQLException e) {
-                if (e.getMessage().contains("UNIQUE")) return "{\"error\":\"Email already registered.\"}";
+                if (e.getMessage().contains("Duplicate entry") || e.getMessage().contains("UNIQUE")) return "{\"error\":\"Email already registered.\"}";
                 throw new StoreException("Signup error", e);
             }
         }
