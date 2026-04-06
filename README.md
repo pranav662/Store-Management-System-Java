@@ -12,6 +12,9 @@
 
 **GroceryPro** is a high-performance, minimal-dependency Java web application designed for modern store management. Built completely from scratch without heavy web frameworks, it features a custom multi-threaded HTTP server (using standard Sockets), a robust SQLite-backed persistence layer, and a beautiful glassmorphic web dashboard for managing inventory, customers, and dynamic billing.
 
+### 🌐 Live Demo
+Access the hosted version on Railway: [**store-management-system-java-production.up.railway.app**](https://store-management-system-java-production.up.railway.app)
+
 ---
 
 ## 🚀 Key Features
