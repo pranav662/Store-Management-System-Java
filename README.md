@@ -90,7 +90,7 @@ Access the hosted version on Railway: [**store-management-system-java-production
     ```cmd
     run.bat
     ```
-    - The terminal will automatically download the required SQLite JDBC driver if it's missing.
+    - The terminal will automatically download the required MySQL JDBC driver if it's missing.
     - It will compile `Store.java` and initialize the local database.
     - A **Control Panel** window will open.
 
