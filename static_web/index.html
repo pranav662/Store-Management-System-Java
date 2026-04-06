@@ -140,6 +140,9 @@ tbody td{padding:11px 14px;color:#cbd5e1;vertical-align:middle}
 .auth-box h2 {text-align:center;font-size:24px;font-weight:700;color:#f1f5f9;margin-bottom:24px;}
 .auth-box .toggle {text-align:center;font-size:13px;color:#94a3b8;margin-top:16px;}
 .auth-box .toggle span {color:#10b981;cursor:pointer;font-weight:600;}
+.auth-error-msg { background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.2); color:#ef4444; padding:10px 12px; border-radius:8px; font-size:13px; margin-bottom:20px; display:none; align-items:center; gap:8px; animation:shake 0.4s ease-in-out; }
+@keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-4px)} 75%{transform:translateX(4px)} }
+
 </style>
 </head>
 <body>
@@ -162,6 +165,7 @@ tbody td{padding:11px 14px;color:#cbd5e1;vertical-align:middle}
         <label>Password</label>
         <input id="auth-pass" type="password" required/>
       </div>
+      <div id="auth-error" class="auth-error-msg"><span>⚠️</span> <div id="auth-error-text"></div></div>
       <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;font-size:15px;padding:10px" id="auth-submit">Sign In</button>
     </form>
     <div class="toggle" id="auth-toggle">Don't have an account? <span>Sign Up</span></div>
@@ -770,6 +774,19 @@ async function toggleBillDetail(id, btn) {
 function esc(s) { if (!s) return ''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
 // ── Auth Logic ─────────────────────────────────────────────────────────────
+function showAuthError(msg) {
+  const el = document.getElementById('auth-error');
+  document.getElementById('auth-error-text').textContent = msg;
+  el.style.display = 'flex';
+}
+function clearAuthError() {
+  document.getElementById('auth-error').style.display = 'none';
+}
+// Clear error on typing
+document.querySelectorAll('#auth-form input').forEach(input => {
+  input.addEventListener('input', clearAuthError);
+});
+
 let isSignup = false;
 function attachToggle() {
   document.getElementById('auth-toggle').querySelector('span').onclick = () => {
@@ -779,6 +796,7 @@ function attachToggle() {
     document.getElementById('auth-toggle').innerHTML = isSignup ? 'Already have an account? <span>Sign In</span>' : 'Don\'t have an account? <span>Sign Up</span>';
     document.getElementById('group-email').style.display = isSignup ? 'flex' : 'none';
     document.getElementById('auth-email').required = isSignup;
+    clearAuthError();
     attachToggle();
   };
 }
@@ -792,12 +810,13 @@ document.getElementById('auth-form').onsubmit = async (e) => {
   const endpoint = isSignup ? '/api/auth/signup' : '/api/auth/login';
   const payload = isSignup ? {username:un, email:u, password:p} : {username:un, password:p};
   
+  clearAuthError();
   const res = await fetch(endpoint, {
     method: 'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify(payload)
   }).then(r => r.json());
 
-  if (res.error) { toast(res.error, 'error'); return; }
+  if (res.error) { showAuthError(res.error); return; }
   
   if (isSignup) {
     toast('Account created! Please sign in.');
