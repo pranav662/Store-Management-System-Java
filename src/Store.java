@@ -299,6 +299,46 @@ public class Store {
                 return hexString.toString();
             } catch (Exception e) { throw new StoreException("Hashing failed", e); }
         }
+
+        static void logAllTables() {
+            String[] tables = {"products", "customers", "bills", "bill_items", "users"};
+            for (String table : tables) {
+                System.out.println("┌─────────────────────────────────────────────────────────────┐");
+                System.out.println("│ TABLE: " + table);
+                System.out.println("└─────────────────────────────────────────────────────────────┘");
+                try (Connection c = conn();
+                     Statement s = c.createStatement();
+                     ResultSet rs = s.executeQuery("SELECT * FROM " + table)) {
+                    ResultSetMetaData meta = rs.getMetaData();
+                    int colCount = meta.getColumnCount();
+                    // Build and print column headers
+                    StringBuilder header = new StringBuilder("  ");
+                    for (int i = 1; i <= colCount; i++) {
+                        if (i > 1) header.append(" | ");
+                        header.append(String.format("%-15s", meta.getColumnName(i)));
+                    }
+                    System.out.println(header.toString());
+                    System.out.println("  " + "─".repeat(Math.max(0, header.length() - 2)));
+                    // Print each row
+                    int rowCount = 0;
+                    while (rs.next()) {
+                        StringBuilder row = new StringBuilder("  ");
+                        for (int i = 1; i <= colCount; i++) {
+                            if (i > 1) row.append(" | ");
+                            String val = rs.getString(i);
+                            row.append(String.format("%-15s", val != null ? val : "NULL"));
+                        }
+                        System.out.println(row.toString());
+                        rowCount++;
+                    }
+                    if (rowCount == 0) System.out.println("  (no rows)");
+                    System.out.println("  Total rows: " + rowCount);
+                } catch (SQLException e) {
+                    System.out.println("  [Error reading table '" + table + "': " + e.getMessage() + "]");
+                }
+                System.out.println();
+            }
+        }
     }
 
     // ══════════════════════════════════════════════════════════════════
@@ -711,6 +751,7 @@ public class Store {
         try {
             Database.init();
             System.out.println("Database initialized.");
+            Database.logAllTables();
         } catch (StoreException e) {
             System.err.println("Fatal: " + e.getMessage()); return;
         }
