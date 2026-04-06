@@ -16,7 +16,8 @@ import java.security.MessageDigest;
  */
 public class Store {
 
-    static final String DB  = System.getenv("MYSQL_URL") != null ? System.getenv("MYSQL_URL") : "jdbc:mysql://localhost:3306/store";
+    static final String MYSQL_URL = System.getenv("MYSQL_URL") != null ? System.getenv("MYSQL_URL") : "jdbc:mysql://localhost:3306/store";
+    static final String DB = MYSQL_URL.startsWith("mysql://") ? MYSQL_URL.replace("mysql://", "jdbc:mysql://") : MYSQL_URL;
     static final int    PORT = System.getenv("PORT") != null ? Integer.parseInt(System.getenv("PORT")) : 8080;
     static final Map<String, Integer> activeSessions = Collections.synchronizedMap(new HashMap<>());
 
@@ -91,7 +92,7 @@ public class Store {
     static class Database {
 
         static void init() throws StoreException {
-            // try-with-resources exception handling
+            if (DB == null) throw new StoreException("MYSQL_URL environment variable is missing.");
             try (Connection c = conn(); Statement s = c.createStatement()) {
                 s.execute("CREATE TABLE IF NOT EXISTS products(id INT PRIMARY KEY AUTO_INCREMENT, user_id INT, name VARCHAR(255),category VARCHAR(255),price DOUBLE,stock INT,unit VARCHAR(50))");
                 s.execute("CREATE TABLE IF NOT EXISTS customers(id INT PRIMARY KEY AUTO_INCREMENT, user_id INT, name VARCHAR(255),phone VARCHAR(50),email VARCHAR(255),address TEXT,created_at DATETIME DEFAULT CURRENT_TIMESTAMP)");

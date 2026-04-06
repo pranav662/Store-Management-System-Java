@@ -18,5 +18,8 @@ RUN javac -cp ".:mysql-connector-j.jar" src/Store.java
 # Default port
 ENV PORT 8080
 
+# Optional: indicate Railway deployment environment
+ENV RAILWAY_ENVIRONMENT true
+
 # Run the server headlessly using the compiled Store class
 ENTRYPOINT ["java", "-Djava.awt.headless=true", "-cp", "src:mysql-connector-j.jar", "Store"]

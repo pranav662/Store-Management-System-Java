@@ -1,7 +1,7 @@
 # 🛒 GroceryPro — Store Management System
 
 [![Java](https://img.shields.io/badge/Java-ED8B00?style=for-the-badge&logo=java&logoColor=white)](https://www.java.com)
-[![SQLite](https://img.shields.io/badge/SQLite-07405E?style=for-the-badge&logo=sqlite&logoColor=white)](https://www.sqlite.org)
+[![MySQL](https://img.shields.io/badge/MySQL-4479A1?style=for-the-badge&logo=mysql&logoColor=white)](https://www.mysql.com)
 [![HTML5](https://img.shields.io/badge/HTML5-E34F26?style=for-the-badge&logo=html5&logoColor=white)](https://developer.mozilla.org/en-US/docs/Web/Guide/HTML/HTML5)
 [![CSS3](https://img.shields.io/badge/CSS3-1572B6?style=for-the-badge&logo=css3&logoColor=white)](https://developer.mozilla.org/en-US/docs/Web/CSS)
 <div align="center">
@@ -10,7 +10,7 @@
   <em>A sleek, glassmorphic dashboard powered entirely by a custom Java HTTP Server</em>
 </div>
 
-**GroceryPro** is a high-performance, minimal-dependency Java web application designed for modern store management. Built completely from scratch without heavy web frameworks, it features a custom multi-threaded HTTP server (using standard Sockets), a robust SQLite-backed persistence layer, and a beautiful glassmorphic web dashboard for managing inventory, customers, and dynamic billing.
+**GroceryPro** is a high-performance, minimal-dependency Java web application designed for modern store management. Built completely from scratch without heavy web frameworks, it features a custom multi-threaded HTTP server (using standard Sockets), a robust MySQL-backed persistence layer hosted on Railway, and a beautiful glassmorphic web dashboard for managing inventory, customers, and dynamic billing.
 
 ### 🌐 Live Demo
 Access the hosted version on Railway: [**store-management-system-java-production.up.railway.app**](https://store-management-system-java-production.up.railway.app)
@@ -66,7 +66,7 @@ Access the hosted version on Railway: [**store-management-system-java-production
 | Layer | Technology |
 | :--- | :--- |
 | **Backend** | Java (Custom HTTP Server via `ServerSocket`) |
-| **Database** | SQLite with JDBC Driver |
+| **Database** | MySQL (Railway) with JDBC Driver |
 | **GUI (Desktop)** | Java Swing / AWT Control Panel |
 | **Frontend** | Vanilla HTML5, CSS3 (Custom Glassmorphic UI), JavaScript (ES6+) |
 | **Concurrency** | Java Multi-threading (`Runnable`, `Thread`) |
@@ -97,6 +97,21 @@ Access the hosted version on Railway: [**store-management-system-java-production
 3.  **Access the Dashboard**:
     - Click **▶ Start Server** in the Control Panel.
     - Open your browser and go to: `http://localhost:8080`
+
+---
+
+## ⚙️ Environment Variables (Railway)
+
+If you are deploying this to Railway, ensure the following variables are set:
+
+| Variable | Description |
+| :--- | :--- |
+| `MYSQL_URL` | The MySQL connection URL (e.g., `mysql://root:password@host:port/database`) |
+| `MYSQLUSER` | Database username (e.g., `root`) |
+| `MYSQLPASSWORD` | Database password |
+| `MYSQLPORT` | Database port (e.g., `3306`) |
+| `PORT` | The port for the Java HTTP Server (defaults to `8080`) |
+
 
 ---
 
