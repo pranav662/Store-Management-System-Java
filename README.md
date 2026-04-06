@@ -15,6 +15,12 @@
 ### 🌐 Live Demo
 Access the hosted version on Railway: [**store-management-system-java-production.up.railway.app**](https://store-management-system-java-production.up.railway.app)
 
+<p align="center">
+  <img src="previews/website_qr.png" alt="Website QR Code" width="200">
+  <br>
+  <em>Scan to visit GroceryPro</em>
+</p>
+
 ---
 
 ## 🚀 Key Features
