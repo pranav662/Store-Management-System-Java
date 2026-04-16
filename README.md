@@ -35,21 +35,18 @@ GroceryPro implements a unique "No-Framework" architecture, focusing on the core
 
 ```mermaid
 graph TD
-    Client((Browser/User)) -- "HTTP/JSON" --> Server[Custom HttpServer]
-    
-    subgraph Java Backend (Store.java)
-        Server -- "Accept Socket" --> Pool[Thread Handler]
-        Pool -- "Parse Request" --> Router{API Router}
-        Router -- "Serve Static" --> Static[SPA: index.html]
-        Router -- "DAO Logic" --> DAO[JDBC / SQL]
+    Client[Browser/User] -->|HTTP/JSON| Server[Custom HttpServer]
+    subgraph Java_Backend [Java Backend]
+        Server -->|Accept Socket| Pool[Thread Handler]
+        Pool -->|Parse Request| Router{API Router}
+        Router -->|Serve Static| Static[SPA: index.html]
+        Router -->|DAO Logic| DAO[JDBC/SQL]
     end
-    
-    subgraph Data Layer
-        DAO -- "TCP/IP" --> MySQL[(MySQL DB)]
+    subgraph Data_Layer [Data Layer]
+        DAO -->|TCP/IP| MySQL[(MySQL DB)]
     end
-    
     subgraph Management
-        GUI[Swing Control Panel] -- "Manage" --> Server
+        GUI[Swing Control Panel] -->|Manage| Server
     end
 ```
 
