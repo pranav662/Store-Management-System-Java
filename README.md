@@ -1,122 +1,137 @@
 # 🛒 GroceryPro — Store Management System
 
-[![Java](https://img.shields.io/badge/Java-ED8B00?style=for-the-badge&logo=java&logoColor=white)](https://www.java.com)
-[![MySQL](https://img.shields.io/badge/MySQL-4479A1?style=for-the-badge&logo=mysql&logoColor=white)](https://www.mysql.com)
-[![HTML5](https://img.shields.io/badge/HTML5-E34F26?style=for-the-badge&logo=html5&logoColor=white)](https://developer.mozilla.org/en-US/docs/Web/Guide/HTML/HTML5)
-[![CSS3](https://img.shields.io/badge/CSS3-1572B6?style=for-the-badge&logo=css3&logoColor=white)](https://developer.mozilla.org/en-US/docs/Web/CSS)
+[![Java](https://img.shields.io/badge/Java-11+-ED8B00?style=for-the-badge&logo=java&logoColor=white)](https://www.java.com)
+[![MySQL](https://img.shields.io/badge/MySQL-8.0+-4479A1?style=for-the-badge&logo=mysql&logoColor=white)](https://www.mysql.com)
+[![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](https://opensource.org/licenses/MIT)
+[![Railway](https://img.shields.io/badge/Railway-Project-blueviolet?style=for-the-badge&logo=railway&logoColor=white)](https://railway.app)
+
 <div align="center">
   <img src="previews/preview_dashboard.png" alt="GroceryPro Dashboard Preview" width="100%">
   <br>
-  <em>A sleek, glassmorphic dashboard powered entirely by a custom Java HTTP Server</em>
+  <h3>Sleek. Fast. Minimalist.</h3>
+  <p><em>A high-performance Java web application built from the ground up without heavy frameworks.</em></p>
 </div>
 
-**GroceryPro** is a high-performance, minimal-dependency Java web application designed for modern store management. Built completely from scratch without heavy web frameworks, it features a custom multi-threaded HTTP server (using standard Sockets), a robust MySQL-backed persistence layer hosted on Railway, and a beautiful glassmorphic web dashboard for managing inventory, customers, and dynamic billing.
+---
 
-### 🌐 Live Demo
-Access the hosted version on Railway: [**store-management-system-java-production.up.railway.app**](https://store-management-system-java-production.up.railway.app)
+## 📖 Overview
+
+**GroceryPro** is a robust, production-ready Store Management System that defies modern bloat. It features a **custom-built multi-threaded HTTP server** (using standard Java Sockets), a hand-crafted JSON parser, and a professional glassmorphic dashboard. Whether managing inventory, tracking high-value customers, or generating smart bills, GroceryPro provides a seamless, high-speed experience.
+
+### 🌐 Live Production Environment
+Access the hosted version on Railway: [**grocerypro-live.up.railway.app**](https://store-management-system-java-production.up.railway.app)
 
 <p align="center">
-  <img src="previews/website_qr.png" alt="Website QR Code" width="200">
+  <img src="previews/website_qr.png" alt="Website QR Code" width="180">
   <br>
-  <em>Scan to visit GroceryPro</em>
+  <em>Scan to launch the dashboard</em>
 </p>
+
+---
+
+## 🏗️ Technical Architecture
+
+GroceryPro implements a unique "No-Framework" architecture, focusing on the core fundamentals of Java Networking and Concurrency.
+
+```mermaid
+graph TD
+    Client((Browser/User)) -- "HTTP/JSON" --> Server[Custom HttpServer]
+    
+    subgraph Java Backend (Store.java)
+        Server -- "Accept Socket" --> Pool[Thread Handler]
+        Pool -- "Parse Request" --> Router{API Router}
+        Router -- "Serve Static" --> Static[SPA: index.html]
+        Router -- "DAO Logic" --> DAO[JDBC / SQL]
+    end
+    
+    subgraph Data Layer
+        DAO -- "TCP/IP" --> MySQL[(MySQL DB)]
+    end
+    
+    subgraph Management
+        GUI[Swing Control Panel] -- "Manage" --> Server
+    end
+```
+
+### 🛠️ Core Technology Stack
+- **Backend Core**: Java (OpenJDK 11+)
+- **Networking**: Custom Socket-level HTTP/1.1 Server (`ServerSocket`)
+- **Database**: MySQL with JDBC (Hosted on Railway)
+- **Frontend**: Vanilla ES6+ JavaScript, CSS3 (Glassmorphism), HTML5
+- **Security**: SHA-256 Password Hashing & UUID Session Management
+- **Desktop Host**: Java Swing / AWT Control Panel
 
 ---
 
 ## 🚀 Key Features
 
-### 📸 Feature Previews
-
-<div align="center">
-  <h4>Products & Inventory</h4>
-  <img src="previews/preview_products.png" alt="Products Preview" width="80%">
-  <br><br>
-  <h4>Customer Management</h4>
-  <img src="previews/preview_customers.png" alt="Customers Preview" width="80%">
-  <br><br>
-  <h4>Smart Billing</h4>
-  <img src="previews/preview_billing.png" alt="Billing Preview" width="80%">
-  <br><br>
-  <h4>Transactional History</h4>
-  <img src="previews/preview_history.png" alt="History Preview" width="80%">
-</div>
-
-### 📊 Modern Dashboard
-- **Real-time Stats**: Track total products, customers, low stock items, and daily revenue at a glance.
-- **Recent Activity**: View the latest transactions in an interactive table.
-
-### 📦 Inventory Management
-- **One-Click Updates**: Modify stock quantities directly from the table.
-- **Full Product Editing**: A custom modal for editing product names, categories, prices, and units.
-- **Low Stock Alerts**: Visual indicators for items that need restocking.
-
-### 👥 Customer Management
-- **Detailed Profiles**: Manage customer contact information and purchase history.
-- **Transactional History**: View all previous bills associated with a specific customer.
-
-### 🧾 Smart Billing System
-- **Quick-Add Items**: Search and add products to the cart instantly.
-- **Transactional Integrity**: Uses SQL transactions to ensure stock is updated only when the bill is successfully created.
-- **Multiple Payments**: Support for Cash, Card, UPI, and Net Banking.
+| Feature | Description |
+| :--- | :--- |
+| **📊 Smart Dashboard** | Real-time tracking of revenue, stock levels, and daily performance metrics. |
+| **📦 Pro Inventory** | One-click stock updates, low-stock alerts, and category management. |
+| **👥 CRM System** | Detailed customer profiles with nested purchase and transaction history. |
+| **🧾 Atomic Billing** | Transactional integrity via JDBC; stock updates only if billing succeeds. |
+| **🔒 Secure Auth** | Multi-user support with encrypted credentials and session persistence. |
 
 ---
 
-## 🛠️ Technology Stack
+## 📸 Feature Showcases
 
-| Layer | Technology |
-| :--- | :--- |
-| **Backend** | Java (Custom HTTP Server via `ServerSocket`) |
-| **Database** | MySQL (Railway) with JDBC Driver |
-| **GUI (Desktop)** | Java Swing / AWT Control Panel |
-| **Frontend** | Vanilla HTML5, CSS3 (Custom Glassmorphic UI), JavaScript (ES6+) |
-| **Concurrency** | Java Multi-threading (`Runnable`, `Thread`) |
+<div align="center">
+  <table border="0">
+    <tr>
+      <td width="50%" align="center"><b>Inventory Management</b><br><img src="previews/preview_products.png"></td>
+      <td width="50%" align="center"><b>Customer CRM</b><br><img src="previews/preview_customers.png"></td>
+    </tr>
+    <tr>
+      <td width="50%" align="center"><b>Smart Billing Terminal</b><br><img src="previews/preview_billing.png"></td>
+      <td width="50%" align="center"><b>Transactional History</b><br><img src="previews/preview_history.png"></td>
+    </tr>
+  </table>
+</div>
 
 ---
 
 ## 🛠️ Getting Started
 
 ### Prerequisites
-- **Java JDK 8 or higher** installed on your system.
-- **Git** (optional, for cloning).
+- **Java JDK 11 or higher**
+- **MySQL Server** (if running locally)
 
-### Setup & Run
+### Setup & Installation
 1.  **Clone the Repository**:
     ```bash
     git clone https://github.com/pranav662/Store-Management-System-Java.git
     cd Store-Management-System-Java
     ```
-2.  **Launch the Application**:
-    Simply double-click `run.bat` or run it from your terminal:
+2.  **Run the Automator**:
+    Double-click `run.bat` or execute via terminal:
     ```cmd
     run.bat
     ```
-    - The terminal will automatically download the required MySQL JDBC driver if it's missing.
-    - It will compile `Store.java` and initialize the local database.
-    - A **Control Panel** window will open.
+    *This will auto-download dependencies, compile source code, and launch the Control Panel.*
 
-3.  **Access the Dashboard**:
-    - Click **▶ Start Server** in the Control Panel.
-    - Open your browser and go to: `http://localhost:8080`
+3.  **Start the Server**:
+    - Click **▶ Start Server** in the window.
+    - Visit `http://localhost:8080` to log in.
 
 ---
 
-## ⚙️ Environment Variables (Railway)
+## ⚙️ Environment Variables
 
-If you are deploying this to Railway, ensure the following variables are set:
+For deployment (Railway/Docker), set these variables:
 
-| Variable | Description |
-| :--- | :--- |
-| `MYSQL_URL` | The MySQL connection URL (e.g., `mysql://root:password@host:port/database`) |
-| `MYSQLUSER` | Database username (e.g., `root`) |
-| `MYSQLPASSWORD` | Database password |
-| `MYSQLPORT` | Database port (e.g., `3306`) |
-| `PORT` | The port for the Java HTTP Server (defaults to `8080`) |
-
+| Variable | Required | Example |
+| :--- | :--- | :--- |
+| `MYSQL_URL` | Yes | `jdbc:mysql://host:port/dbname` |
+| `MYSQLUSER` | Yes | `root` |
+| `MYSQLPASSWORD` | Yes | `your_secure_password` |
+| `PORT` | No | `8080` (Default) |
 
 ---
 
-## 📄 License
-This project is licensed under the MIT License - see the LICENSE file for details.
+## 📜 License
+Licensed under the **MIT License**. See [LICENSE](LICENSE) for details.
 
 ---
-Built with ❤️ by [Pranav](https://github.com/pranav662)
+Built with ☕ and ❤️ by [Pranav](https://github.com/pranav662)
